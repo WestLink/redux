@@ -18,7 +18,10 @@ import compose from './compose'
  */
 export default function applyMiddleware(...middlewares) {
   return (createStore) => (...args) => {
+    // 创建真正的store
     const store = createStore(...args)
+
+    // 中间件在处理过程中不允许分发action
     let dispatch = () => {
       throw new Error(
         'Dispatching while constructing your middleware is not allowed. ' +
@@ -30,7 +33,9 @@ export default function applyMiddleware(...middlewares) {
       getState: store.getState,
       dispatch: (...args) => dispatch(...args),
     }
+    // 中间件创建完的结果应该是一个函数结果数组
     const chain = middlewares.map((middleware) => middleware(middlewareAPI))
+    // 合成一个有顺序的最终的队列形式的dispatch，
     dispatch = compose(...chain)(store.dispatch)
 
     return {

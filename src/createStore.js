@@ -30,8 +30,10 @@ import { kindOf } from './utils/kindOf'
  * and subscribe to changes.
  */
 export default function createStore(reducer, preloadedState, enhancer) {
+  // 确保参数的合法性，预加载的状态不能是函数
   if (
     (typeof preloadedState === 'function' && typeof enhancer === 'function') ||
+    //Todo 为啥还不允许第四个参数？
     (typeof enhancer === 'function' && typeof arguments[3] === 'function')
   ) {
     throw new Error(
@@ -41,6 +43,7 @@ export default function createStore(reducer, preloadedState, enhancer) {
     )
   }
 
+  // 处理第二个参数是enhancer的情况
   if (typeof preloadedState === 'function' && typeof enhancer === 'undefined') {
     enhancer = preloadedState
     preloadedState = undefined
@@ -54,7 +57,7 @@ export default function createStore(reducer, preloadedState, enhancer) {
         )}'`
       )
     }
-
+    // 交由第三方来处理store的创建
     return enhancer(createStore)(reducer, preloadedState)
   }
 
@@ -66,6 +69,7 @@ export default function createStore(reducer, preloadedState, enhancer) {
     )
   }
 
+  // 记录各种中间状态
   let currentReducer = reducer
   let currentState = preloadedState
   let currentListeners = []
@@ -80,7 +84,7 @@ export default function createStore(reducer, preloadedState, enhancer) {
    * subscribe/unsubscribe in the middle of a dispatch.
    */
   function ensureCanMutateNextListeners() {
-    if (nextListeners === currentListeners) {
+    if (nextListeners === currentListeners) { // 相同引用时，复制一份，保障可隔离的修改
       nextListeners = currentListeners.slice()
     }
   }
@@ -144,10 +148,10 @@ export default function createStore(reducer, preloadedState, enhancer) {
     }
 
     let isSubscribed = true
-
+    // 放到下个队列的队尾，不影响当前的
     ensureCanMutateNextListeners()
     nextListeners.push(listener)
-
+    // 直接返回一个反注册的能力
     return function unsubscribe() {
       if (!isSubscribed) {
         return
@@ -163,8 +167,10 @@ export default function createStore(reducer, preloadedState, enhancer) {
       isSubscribed = false
 
       ensureCanMutateNextListeners()
+      // 从下个队列中删除监听者
       const index = nextListeners.indexOf(listener)
       nextListeners.splice(index, 1)
+      // TODO 为啥要清空当前的队列?
       currentListeners = null
     }
   }
@@ -195,7 +201,7 @@ export default function createStore(reducer, preloadedState, enhancer) {
    * return something else (for example, a Promise you can await).
    */
   function dispatch(action) {
-    if (!isPlainObject(action)) {
+    if (!isPlainObject(action)) { // 原生只能处理对象类型的action
       throw new Error(
         `Actions must be plain objects. Instead, the actual type was: '${kindOf(
           action
@@ -220,7 +226,8 @@ export default function createStore(reducer, preloadedState, enhancer) {
       isDispatching = false
     }
 
-    const listeners = (currentListeners = nextListeners)
+    // 分发消息给监听者，分发过程中当前队列和下个队列是相同引用，这个过程中，订阅操作影响的是下个队列
+    const listeners = (currentListeners = nextListeners) // 下个队列会成为当前队列
     for (let i = 0; i < listeners.length; i++) {
       const listener = listeners[i]
       listener()
@@ -254,7 +261,7 @@ export default function createStore(reducer, preloadedState, enhancer) {
     // Any reducers that existed in both the new and old rootReducer
     // will receive the previous state. This effectively populates
     // the new state tree with any relevant data from the old one.
-    dispatch({ type: ActionTypes.REPLACE })
+    dispatch({ type: ActionTypes.REPLACE }) // TODO 这个Action谁在处理？
   }
 
   /**
@@ -283,12 +290,13 @@ export default function createStore(reducer, preloadedState, enhancer) {
           )
         }
 
+        // 分发状态改变的事件
         function observeState() {
           if (observer.next) {
             observer.next(getState())
           }
         }
-
+        // 订阅的时候就先通知一下
         observeState()
         const unsubscribe = outerSubscribe(observeState)
         return { unsubscribe }

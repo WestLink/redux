@@ -31,6 +31,8 @@ function getUnexpectedStateShapeWarningMessage(
     )
   }
 
+  // TODO 状态和reducer必须一一对应吗？
+  // 通过combine后，state也会按照对应的结构进行组织
   const unexpectedKeys = Object.keys(inputState).filter(
     (key) => !reducers.hasOwnProperty(key) && !unexpectedKeyCache[key]
   )
@@ -56,6 +58,7 @@ function assertReducerShape(reducers) {
     const reducer = reducers[key]
     const initialState = reducer(undefined, { type: ActionTypes.INIT })
 
+    // 当前reducer没返回任何东西，不合理！至少应该返回null
     if (typeof initialState === 'undefined') {
       throw new Error(
         `The slice reducer for key "${key}" returned undefined during initialization. ` +
@@ -66,6 +69,7 @@ function assertReducerShape(reducers) {
       )
     }
 
+    // 当前reducer处理了内置的action，不合理！没法处理的应该返回当前的状态
     if (
       typeof reducer(undefined, {
         type: ActionTypes.PROBE_UNKNOWN_ACTION(),
@@ -102,6 +106,7 @@ function assertReducerShape(reducers) {
 export default function combineReducers(reducers) {
   const reducerKeys = Object.keys(reducers)
   const finalReducers = {}
+  // 过滤掉非法的reducer，比如没有值的或者值不为函数的
   for (let i = 0; i < reducerKeys.length; i++) {
     const key = reducerKeys[i]
 
@@ -131,7 +136,9 @@ export default function combineReducers(reducers) {
     shapeAssertionError = e
   }
 
+  // 因为reducer是个函数，所以这里返回的是函数
   return function combination(state = {}, action) {
+    // 某个reducer有问题，直接抛出异常
     if (shapeAssertionError) {
       throw shapeAssertionError
     }
@@ -168,6 +175,7 @@ export default function combineReducers(reducers) {
       nextState[key] = nextStateForKey
       hasChanged = hasChanged || nextStateForKey !== previousStateForKey
     }
+    // TODO 后面那一截判断说明啥？
     hasChanged =
       hasChanged || finalReducerKeys.length !== Object.keys(state).length
     return hasChanged ? nextState : state
